@@ -108,6 +108,7 @@ limitations under the License.
 #include "xla/service/float_normalization.h"
 #include "xla/service/float_support.h"
 #include "xla/service/gather_expander.h"
+#include "xla/service/gather_scatter_normalizer.h"
 #include "xla/service/gather_simplifier.h"
 #include "xla/service/gpu/autotuning/autotuner_util.h"
 #include "xla/service/gpu/autotuning/custom_kernel_fusion_autotuner.h"
@@ -527,6 +528,7 @@ absl::Status RunPreSPMDPartitionerPasses(HloModule* hlo_module) {
   HloPassPipeline pre_spmd_pipeline("pre-spmd-partitioner");
   // Run some IR cleanup passes before running the SPMD partitioning
   // passes.
+  pre_spmd_pipeline.AddPass<GatherScatterNormalizer>();
   pre_spmd_pipeline.AddPass<CuDnnCustomCallConverter>();
   pre_spmd_pipeline.AddPass<ConvertMemoryPlacementToInternalAnnotations>();
   pre_spmd_pipeline.AddPass<CallInliner>();
@@ -628,6 +630,7 @@ absl::Status RunOptimizationPasses(
 
   HloPassPipeline pipeline("optimization");
   AddHloVerifier(&pipeline);
+
   if (debug_options.xla_gpu_multi_streamed_windowed_einsum()) {
     pipeline.AddPass<WindowedEinsumHandler>();
   }

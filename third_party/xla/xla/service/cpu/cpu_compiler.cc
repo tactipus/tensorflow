@@ -130,6 +130,7 @@ limitations under the License.
 #include "xla/service/float_normalization.h"
 #include "xla/service/float_support.h"
 #include "xla/service/gather_expander.h"
+#include "xla/service/gather_scatter_normalizer.h"
 #include "xla/service/hlo.pb.h"
 #include "xla/service/hlo_constant_folding.h"
 #include "xla/service/hlo_cost_analysis.h"
@@ -445,6 +446,7 @@ absl::Status CpuCompiler::RunHloPassesThroughLayoutAssn(
     // passes.
     AddHloVerifier(&spmd_pipeline);
     spmd_pipeline.AddPass<CallInliner>();
+    spmd_pipeline.AddPass<GatherScatterNormalizer>();
     spmd_pipeline.AddPass<ZeroSizedHloElimination>();
     spmd_pipeline.AddPass<ConditionalCanonicalizer>();
     if (module->config().use_shardy_partitioner()) {
@@ -462,6 +464,7 @@ absl::Status CpuCompiler::RunHloPassesThroughLayoutAssn(
     HloPassPipeline sharding_removal_pipeline("sharding-removal");
     AddHloVerifier(&sharding_removal_pipeline);
     // Remove redundant sharding ops when partition_count == 1.
+    sharding_removal_pipeline.AddPass<GatherScatterNormalizer>();
     sharding_removal_pipeline.AddPass<ShardingRemover>();
     sharding_removal_pipeline.AddPass<HloDCE>();
     TF_RETURN_IF_ERROR(sharding_removal_pipeline.Run(module).status());

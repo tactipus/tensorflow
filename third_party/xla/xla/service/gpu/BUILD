@@ -1594,7 +1594,7 @@ cc_library(
         # go/keep-sorted end
     ]) + xla_internal(["service:export_hlo"]) + if_google([
         "//xla/hlo/experimental/auto_sharding",
-    ]),
+    ]) + ["//xla/service:gather_scatter_normalizer"],
 )
 
 xla_test(

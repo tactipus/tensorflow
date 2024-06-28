@@ -248,8 +248,8 @@ absl::Status UpgradeVersionedStablehlo(mlir::ModuleOp mlir_module) {
 std::string GetDefaultStablehloVersion() {
   // This version must be >=12w old.
   // See https://github.com/openxla/stablehlo/tags
-  //   0.19.0 - Mar 13, 2024
-  return "0.19.0";
+  //   0.17.0 - Jan 4, 2024 DO MOY SUBMIT
+  return "1.1.1";
 }
 
 absl::StatusOr<std::string> Serialize(mlir::ModuleOp module,

@@ -278,6 +278,7 @@ cc_library(
         "//xla/service:float_normalization",
         "//xla/service:float_support",
         "//xla/service:gather_expander",
+        "//xla/service:gather_scatter_normalizer",
         "//xla/service:hlo_constant_folding",
         "//xla/service:hlo_cost_analysis",
         "//xla/service:hlo_cse",
