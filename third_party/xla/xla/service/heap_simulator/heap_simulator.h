@@ -412,10 +412,10 @@ class BufferIntervalTree {
   // inclusive.
   std::vector<int64_t> MemoryUsedInInterval(int64_t start, int64_t end) const;
 
- private:
   std::vector<const BufferIntervalTreeNode*> NodesOverlappingInTime(
       int64_t start, int64_t end) const;
 
+ private:
   BufferIntervalTreeNode* root_ = nullptr;
   std::list<BufferIntervalTreeNode> node_storage_;
 };

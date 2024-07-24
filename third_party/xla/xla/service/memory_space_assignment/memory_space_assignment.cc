@@ -1035,14 +1035,15 @@ absl::Status MemorySpaceAssignment::VerifyAndExportHeapSimulatorTrace() {
     // really should check against end_time (inclusive) for cases where the
     // operand can't share buffer with user (see
     // HloDataflowAnalysis::CanShareOperandBufferWithUser).
-    for (const HeapSimulator::Chunk& overlapping_chunk :
-         interval_tree.ChunksOverlappingInTime(start_time, end_time - 1)) {
-      if (chunk.OverlapsWith(overlapping_chunk)) {
+    for (const BufferIntervalTreeNode* overlapping_node :
+         interval_tree.NodesOverlappingInTime(start_time, end_time - 1)) {
+      if (chunk.OverlapsWith(overlapping_node->chunk)) {
         return Internal(
             ("Value %s (%d, %d) off: %d size: %d overlaps with another chunk"
-             " off: %d size: %d"),
+             " off: %d size: %d start_time: %d"),
             value->ToShortString(), start_time, end_time, chunk.offset,
-            chunk.size, overlapping_chunk.offset, overlapping_chunk.size);
+            chunk.size, overlapping_node->chunk.offset,
+            overlapping_node->chunk.size, overlapping_node->start);
       }
     }
     interval_tree.Add(start_time, end_time - 1, chunk);
