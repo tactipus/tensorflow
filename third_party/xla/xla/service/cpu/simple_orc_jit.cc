@@ -88,7 +88,12 @@ namespace cpu {
 std::vector<std::string> DetectMachineAttributes() {
   std::vector<std::string> result;
   for (const auto& [feature, enabled] : llvm::sys::getHostCPUFeatures()) {
-    result.push_back((enabled ? '+' : '-') + std::string(feature));
+    if (feature.contains("avx512")) {
+      result.push_back('-' + std::string(feature));
+    } else {
+      result.push_back((enabled ? '+' : '-') + std::string(feature));
+    }
+    // LOG(INFO) << "feature: " << result.back();
   }
   return result;
 }

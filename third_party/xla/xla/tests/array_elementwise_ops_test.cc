@@ -2270,6 +2270,16 @@ XLA_TEST_F(ArrayElementwiseOpTest, MinZeroElementF32s) {
   ComputeAndCompareR1<float>(&builder, {}, {}, error_spec_);
 }
 
+XLA_TEST_F(ArrayElementwiseOpTest, MinF16) {
+  XlaBuilder builder(TestName());
+  SetFastMathDisabled(true);
+  auto lhs = ConstantR0<Eigen::half>(&builder, static_cast<Eigen::half>(1.0f));
+  auto rhs = ConstantR0<Eigen::half>(&builder, static_cast<Eigen::half>(2.0f));
+  Min(lhs, rhs);
+
+  ComputeAndCompare(&builder, {});
+}
+
 XLA_TEST_F(ArrayElementwiseOpTest, MinF64s) {
   XlaBuilder builder(TestName());
   SetFastMathDisabled(true);

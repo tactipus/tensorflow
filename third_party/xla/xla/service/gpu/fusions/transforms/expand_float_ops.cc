@@ -648,10 +648,12 @@ class ExpandFloatOpsPass
   using ExpandFloatOpsPassBase::ExpandFloatOpsPassBase;
   void runOnOperation() override {
     mlir::RewritePatternSet patterns(&getContext());
+#if 0
     patterns.add<RewriteToCmpSelect<ma::MinimumFOp, ma::CmpFPredicate::OLE>>(
         &getContext(), /*include_f32=*/pre_ampere_);
     patterns.add<RewriteToCmpSelect<ma::MaximumFOp, ma::CmpFPredicate::OGE>>(
         &getContext(), /*include_f32=*/pre_ampere_);
+#endif
     patterns.add<RewriteTruncFPattern, RewriteExtFPattern, RewriteAbsFPattern,
                  RewriteF8Cst, RewriteIToFpPattern<ma::SIToFPOp>,
                  RewriteIToFpPattern<ma::UIToFPOp>,
