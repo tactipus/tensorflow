@@ -50,6 +50,8 @@ struct PassConfig {
   bool unfold_batch_matmul = true;
   // Whether to outline WhileOp at the end of the pipeline.
   bool outline_tf_while = false;
+  // Whether to outline IfOp at the end of the pipeline.
+  bool outline_tf_if = true;
   // Whether to do shape inference.
   bool shape_inference = true;
   // Whether to do TFLite runtime verification.

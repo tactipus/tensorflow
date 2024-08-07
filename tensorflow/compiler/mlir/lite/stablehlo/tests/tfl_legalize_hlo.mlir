@@ -2835,3 +2835,34 @@ func.func @less_equal(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>) -> tensor<2xi1
 }
 
 // CHECK: tfl.less_equal
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// mhlo.if
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: if
+func.func @if(%arg0: tensor<i1>) -> (tensor<i32>) {
+  %cst_0 = arith.constant dense<0> : tensor<i32>
+  %cst_1 = arith.constant dense<1000> : tensor<i32>
+  %0 = mhlo.add %cst_0, %cst_1 : tensor<i32>
+  %1 = "mhlo.if"(%arg0) ({
+    "mhlo.return"(%0) : (tensor<i32>) -> ()
+  }, {
+    %2 = mhlo.multiply %cst_0, %cst_1 : tensor<i32>
+    "mhlo.return"(%2) : (tensor<i32>) -> ()
+  }) : (tensor<i1>) -> tensor<i32>
+  func.return %1: tensor<i32>
+}
+
+// CHECK: %[[CST:.*]] = arith.constant dense<0> : tensor<i32>
+// CHECK: %[[CST_0:.*]] = arith.constant dense<1000> : tensor<i32>
+// CHECK: %[[VAL_0:.*]] = mhlo.add %[[CST]], %[[CST_0]] : tensor<i32>
+// CHECK: %[[VAL_1:.*]] = "tfl.if"(%arg0) ({
+// CHECK:  "tfl.yield"(%[[VAL_0]]) : (tensor<i32>) -> ()
+// CHECK: }, {
+// CHECK: %[[VAL_2:.*]] = mhlo.multiply %[[CST]], %[[CST_0]] : tensor<i32>
+// CHECK:  "tfl.yield"(%[[VAL_2]]) : (tensor<i32>) -> ()
+// CHECK: }) : (tensor<i1>) -> tensor<i32>
+// CHECK: return %[[VAL_1]] : tensor<i32>
