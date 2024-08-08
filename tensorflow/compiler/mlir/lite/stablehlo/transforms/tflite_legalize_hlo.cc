@@ -45,6 +45,7 @@ limitations under the License.
 #include "tensorflow/compiler/mlir/lite/stablehlo/transforms/legalize_hlo_conversions/slice.h"
 #include "tensorflow/compiler/mlir/lite/stablehlo/transforms/legalize_hlo_conversions/sort.h"
 #include "tensorflow/compiler/mlir/lite/stablehlo/transforms/legalize_hlo_conversions/util.h"  // IWYU pragma: keep
+#include "tensorflow/compiler/mlir/lite/stablehlo/transforms/legalize_hlo_conversions/while.h"
 #include "tensorflow/compiler/mlir/lite/stablehlo/transforms/passes.h"
 #include "tensorflow/compiler/mlir/lite/transforms/passes.h"  // IWYU pragma: keep
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"  // IWYU pragma: keep
@@ -244,9 +245,11 @@ void LegalizeHloToTfLitePass::runOnOperation() {
 
   target.addDynamicallyLegalOp<mhlo::CustomCallOp>(IsCustomCallLegal);
   target.addDynamicallyLegalOp<mhlo::CbrtOp>(IsCbrtLegal);
+  target.addDynamicallyLegalOp<mhlo::WhileOp>(IsWhileLegal);
   target.addIllegalOp<mhlo::DotGeneralOp, mhlo::DotOp, mhlo::TransposeOp,
                       mhlo::ShiftRightArithmeticOp, mhlo::ShiftRightLogicalOp,
-                      mhlo::RemOp, mhlo::ReshapeOp, mhlo::DynamicReshapeOp>();
+                      mhlo::RemOp, mhlo::ReshapeOp, mhlo::DynamicReshapeOp,
+                      mhlo::WhileOp>();
   target.addDynamicallyLegalOp<mhlo::NotOp>(IsNotOpLegal);
   target.addDynamicallyLegalOp<mhlo::CompareOp>(IsCompareLegal);
 
@@ -260,6 +263,7 @@ void LegalizeHloToTfLitePass::runOnOperation() {
   PopulateLegalizeConvPatterns(context, patterns, target);
   PopulateLegalizeSlicePatterns(context, patterns, target);
   PopulateSortPatterns(context, patterns, target);
+  PopulateWhilePatterns(context, patterns, target);
 
   if (failed(applyPartialConversion(getOperation(), target,
                                     std::move(patterns)))) {
