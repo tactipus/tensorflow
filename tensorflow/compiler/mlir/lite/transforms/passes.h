@@ -21,6 +21,8 @@ limitations under the License.
 
 #include "absl/container/flat_hash_set.h"
 #include "mlir/Pass/Pass.h"  // from @llvm-project
+#include "mlir/Pass/PassRegistry.h"  // from @llvm-project  // IWYU pragma: keep
+#include "tensorflow/compiler/mlir/lite/transforms/optimize.h"
 #include "tensorflow/compiler/mlir/quantization/common/quantization_lib/quantization_config.h"
 
 namespace mlir {
@@ -60,8 +62,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> CreateLegalizeTFPass(
 std::unique_ptr<OperationPass<func::FuncOp>> CreateLegalizeTFPass();
 
 // Creates an instance of the TensorFlow Lite dialect Optimize pass.
-std::unique_ptr<OperationPass<func::FuncOp>> CreateOptimizePass(
-    bool enable_canonicalization, bool disable_fuse_mul_and_fc = false);
 std::unique_ptr<OperationPass<func::FuncOp>> CreateOptimizePass();
 
 // Creates an instance of the Tensorflow Lite batch matmul Optimize pass.
@@ -287,6 +287,22 @@ std::unique_ptr<OperationPass<func::FuncOp>> CreateRaiseCustomOpsPass(
 // quantization parameters.
 std::unique_ptr<OperationPass<func::FuncOp>> CreateDefaultQuantParamsPass(
     const DefaultQuantParamsPassOptions& options);
+
+inline void registerOptimizePass() {
+  auto pass_argument = OptimizePass::GetArgument();
+  auto pass_description = OptimizePass::GetDescription();
+  PassPipelineRegistration<OptimizePassOptions>(
+      pass_argument, pass_description,
+      [](OpPassManager& pm, const OptimizePassOptions& options) {
+        pm.addPass(CreateOptimizePass(options));
+      });
+}
+
+inline void registerTensorFlowLitePasses() {
+  registerTensorFlowLiteTdPasses();
+  registerOptimizePass();
+}
+
 }  // namespace TFL
 
 }  // namespace mlir
