@@ -14,9 +14,11 @@ limitations under the License.
 ==============================================================================*/
 
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <ios>
 #include <limits>
 #include <tuple>
 #include <type_traits>
@@ -45,7 +47,7 @@ namespace {
 // including float16 and bfloat.
 //
 // Test parameter is a pair of (begin, end) for range under test.
-template <PrimitiveType T>
+template <PrimitiveType T, bool kLeftToRightPacking = false>
 class Exhaustive16BitBinaryTest
     : public ExhaustiveBinaryTest<T>,
       public ::testing::WithParamInterface<std::pair<int64_t, int64_t>> {
@@ -67,17 +69,47 @@ class Exhaustive16BitBinaryTest
 
     int64_t begin, end;
     std::tie(begin, end) = GetParam();
-    VLOG(2) << "Checking range [" << begin << ", " << end << "]";
+
+    uint16_t left_begin =
+        std::bit_cast<uint16_t>(static_cast<int16_t>(begin >> 16));
+    uint16_t left_end =
+        std::bit_cast<uint16_t>(static_cast<int16_t>(end >> 16));
+    uint16_t right_begin = std::bit_cast<uint16_t>(static_cast<int16_t>(begin));
+    uint16_t right_end = std::bit_cast<uint16_t>(static_cast<int16_t>(end));
+    if (VLOG_IS_ON(2)) {
+      LOG(INFO) << this->SuiteName() << this->TestName() << " Range:";
+      LOG(INFO) << "\tfrom=(" << left_begin << ", " << right_begin << "); hex=("
+                << std::hex << left_begin << ", " << right_begin << "); float=("
+                << *reinterpret_cast<xla::bfloat16*>(&left_begin) << ", "
+                << *reinterpret_cast<xla::bfloat16*>(&right_begin)
+                << ") (inclusive)";
+      LOG(INFO) << "\tto=(" << left_end << ", " << right_end << "); hex=("
+                << std::hex << left_end << ", " << right_end << "); float=("
+                << *reinterpret_cast<xla::bfloat16*>(&left_end) << ", "
+                << *reinterpret_cast<xla::bfloat16*>(&right_end)
+                << ") (exclusive)";
+      LOG(INFO) << "\ttotal values to test=" << (end - begin);
+    }
 
     absl::Span<NativeT> input_arr_0 = (*input_literals)[0].data<NativeT>();
     absl::Span<NativeT> input_arr_1 = (*input_literals)[1].data<NativeT>();
     for (int64_t i = 0; i < input_size; i++) {
       uint32_t input_val = i + begin;
-      // Convert the lower 16 bits to the NativeT and replaced known incorrect
-      // input values with 0.
-      input_arr_0[i] = ConvertAndReplaceKnownIncorrectValueWith(input_val, 0);
-      input_arr_1[i] =
-          ConvertAndReplaceKnownIncorrectValueWith(input_val >> 16, 0);
+      // Convert the packed bits to a pair of NativeT and replace known
+      // incorrect input values with 0.
+      //
+      // In either case, we only use 32 bits out of the 64 bits possible.
+      if constexpr (kLeftToRightPacking) {
+        // Left is stored at higher 16 bits.
+        input_arr_0[i] =
+            ConvertAndReplaceKnownIncorrectValueWith(input_val >> 16, 0);
+        input_arr_1[i] = ConvertAndReplaceKnownIncorrectValueWith(input_val, 0);
+      } else {
+        // Left is stored at lower 16 bits.
+        input_arr_0[i] = ConvertAndReplaceKnownIncorrectValueWith(input_val, 0);
+        input_arr_1[i] =
+            ConvertAndReplaceKnownIncorrectValueWith(input_val >> 16, 0);
+      }
     }
   }
 

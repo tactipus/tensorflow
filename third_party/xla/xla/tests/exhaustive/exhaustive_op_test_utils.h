@@ -32,6 +32,7 @@ limitations under the License.
 
 #include "absl/algorithm/container.h"
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -333,6 +334,21 @@ class ExhaustiveOpTestBase : public ClientLibraryTestBase {
     // Run all HLO passes.  In particular, constant folding is disabled by
     // default for tests, but we need to run it in order to tickle some bugs.
     mutable_debug_options()->clear_xla_disable_hlo_passes();
+  }
+
+  // Enable debug logging for the invocation of the lambda.
+  //
+  // This is intended to be used to wrap a call to `Run`, which will then log
+  // extra debug information for a failure such as the calculated absolute,
+  // relative, and distance errors. In addition, in an effort to reduce output
+  // log size, this will trigger an ASSERT failure to early return from a test
+  // at the first failure.
+  template <typename Callable,
+            std::enable_if_t<std::is_invocable_r_v<void, Callable>, int> = 0>
+  void EnableDebugLoggingForScope(Callable&& work) {
+    should_emit_debug_logging_ = true;
+    work();
+    should_emit_debug_logging_ = false;
   }
 
   void Run(EnqueueOp enqueue_op, EvaluateOp evaluate_op,
@@ -657,8 +673,17 @@ class ExhaustiveOpTestBase : public ClientLibraryTestBase {
     // will be wildly off. We convert back to NativeT for this comparison.
     int64_t distance_err = GetDistanceErr(NativeT(expected), NativeT(actual));
 
-    return abs_err <= spec.abs_err || rel_err <= spec.rel_err ||
-           distance_err <= spec.distance_err;
+    bool passed = abs_err <= spec.abs_err || rel_err <= spec.rel_err ||
+                  distance_err <= spec.distance_err;
+    if (should_emit_debug_logging_ && !passed) {
+      LOG(INFO) << "actual: " << actual << "; expected: " << expected
+                << "\n\tabs_err: " << abs_err
+                << "; spec.abs_err: " << spec.abs_err
+                << "\n\trel_err: " << rel_err << "; rel_err: " << rel_err
+                << "\n\tdistance_err: " << distance_err
+                << "\n\tspec.distance_err: " << spec.distance_err;
+    }
+    return passed;
   }
 
   // Converts part or all bits in an uint64_t to the value of the floating point
@@ -712,6 +737,10 @@ class ExhaustiveOpTestBase : public ClientLibraryTestBase {
 
   // Indicates if files of the expected and actual values should be dumped.
   bool should_dump_values_ = false;
+
+  // Indicates if additional (potentially costly) logging should be emitted to
+  // ease with debugging.
+  bool should_emit_debug_logging_ = false;
 };
 
 // Represents a set of 64 bit chunks by representing the starting bit chunk,
@@ -979,9 +1008,10 @@ class FpValues {
   std::array<int, kTotalBitChunks + 1> offsets_;
 };
 
-template <typename T, typename std::enable_if<
-                          std::is_same<T, float>::value ||
-                          std::is_same<T, double>::value>::type* = nullptr>
+template <typename T,
+          typename std::enable_if_t<std::is_same_v<T, xla::bfloat16> ||
+                                    std::is_same_v<T, float> ||
+                                    std::is_same_v<T, double>>* = nullptr>
 int GetMantissaTotalBits() {
   return std::numeric_limits<T>::digits - 1;
 }
@@ -1006,9 +1036,10 @@ uint64_t GetAllOneExponent() {
   return (1ull << GetExponentTotalBits<T>()) - 1ull;
 }
 
-template <typename T, typename std::enable_if<
-                          std::is_same<T, float>::value ||
-                          std::is_same<T, double>::value>::type* = nullptr>
+template <typename T,
+          typename std::enable_if_t<std::is_same_v<T, xla::bfloat16> ||
+                                    std::is_same_v<T, float> ||
+                                    std::is_same_v<T, double>>* = nullptr>
 FpValues GetFpValues(BitChunks mantissa, BitChunks exponent, BitChunks sign) {
   int total_bits = GetFpTotalBits<T>();
   return FpValues({mantissa, exponent, sign},
@@ -1119,6 +1150,67 @@ template <typename T>
 std::vector<FpValues> CreateFpValuesForBoundaryTest() {
   return {GetZeros<T>(), GetSubnormals<T>(1000), GetInfinites<T>(),
           GetNans<T>(1000)};
+}
+
+// Creates ranges for exhaustively testing T pairs, (T1, T2), where T1 and T2
+// both only range over the subnormal values for T.
+//
+// This is intended to be used for exhaustive binary tests where it is helpful
+// to only look at how subnormals interact for both parameters.
+//
+// Ranges are encoded as a tuple of `int64_t`. Each `int64_t` tuple element is a
+// packed pair of values equal to `(T1 << TotalBits(T)) | T2`. A range
+// `((T1,T2),(T3,T4))` will test all binary pairs between `(T1,T2)`, inclusive,
+// and `(T3,T4)`, exclusive.
+//
+// Supported T are:
+// - xla::bfloat16
+// - xla::half
+// - float
+template <typename T>
+inline std::vector<std::pair<int64_t, int64_t>> CreateSubnormalStrictRanges() {
+  std::vector<std::pair<int64_t, int64_t>> ret;
+  // N.B.: Exclude 0.
+  int subnormal_count = (1ull << GetMantissaTotalBits<T>()) - 1;
+  // N.B.: subnormal_count / 2 is intended to provide mantissa spacing of 1.
+  for (auto subnormal :
+       GetSubnormals<T>((1ull << GetMantissaTotalBits<T>()) / 2)) {
+    // | 1 avoids selecting 0 as the first right value.
+    auto start = (subnormal << GetFpTotalBits<T>()) | 1;
+    auto end = start + subnormal_count;
+    ret.push_back({start, end});
+  }
+  return ret;
+}
+
+// Creates ranges for exhaustively testing T pairs, (T1, T2), where T1 and T2
+// only range over the subnormal values for T.
+//
+// This is intended to be used for exhaustive binary tests where it is helpful
+// to only look at how subnormals interact for both parameters.
+//
+// Ranges are encoded as a tuple of `int64_t`. Each `int64_t` tuple element is a
+// packed pair of values equal to `(T1 << TotalBits(T)) | T2`. A range
+// `((T1,T2),(T3,T4))` will test all binary pairs between `(T1,T2)`, inclusive,
+// and `(T3,T4)`, exclusive.
+//
+// Supported T are:
+// - xla::bfloat16
+// - xla::half
+// - float
+template <typename T>
+inline std::vector<std::pair<int64_t, int64_t>>
+CreateSubnormalExhaustiveRanges() {
+  std::vector<std::pair<int64_t, int64_t>> ret;
+  int entire_count = 1ull << GetFpTotalBits<T>();
+  // N.B.: subnormal_count / 2 is intended to provide mantissa spacing of 1.
+  for (auto subnormal :
+       GetSubnormals<T>((1ull << GetMantissaTotalBits<T>()) / 2)) {
+    auto start = subnormal << GetFpTotalBits<T>();
+    auto end = start + entire_count;
+    ret.push_back({start, end});
+  }
+  return ret;
 }
 
 inline std::vector<std::pair<int64_t, int64_t>> CreateExhaustiveF32Ranges() {
@@ -1242,9 +1334,9 @@ typename ErrorSpecGenWrapper<T, N>::type GetDefaultSpecGenerator() {
   return DefaultSpecGenerator<T, N>;
 }
 
-template <typename T, typename std::enable_if<
-                          std::is_same<T, float>::value ||
-                          std::is_same<T, double>::value>::type* = nullptr>
+template <typename T,
+          typename std::enable_if_t<std::is_same<T, float>::value ||
+                                    std::is_same<T, double>::value>* = nullptr>
 T ReferenceMax(T x, T y) {
   // We need to propagate NAN here because std::max may not propagate NAN.
   if (std::fpclassify(x) == FP_NAN) {
@@ -1257,9 +1349,9 @@ T ReferenceMax(T x, T y) {
   return std::max<T>(x, y);
 }
 
-template <typename T, typename std::enable_if<
-                          std::is_same<T, float>::value ||
-                          std::is_same<T, double>::value>::type* = nullptr>
+template <typename T,
+          typename std::enable_if_t<std::is_same<T, float>::value ||
+                                    std::is_same<T, double>::value>* = nullptr>
 T ReferenceMin(T x, T y) {
   // We need to propagate NAN here because std::max may not propagate NAN.
   if (std::fpclassify(x) == FP_NAN) {
