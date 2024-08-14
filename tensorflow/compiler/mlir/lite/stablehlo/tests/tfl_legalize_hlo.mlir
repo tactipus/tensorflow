@@ -720,6 +720,40 @@ func.func @logical_xor(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1>
 // 2D
 //=---
 
+// CHECK-LABEL: transpose_conv2d_same_padding
+func.func @transpose_conv2d_same_padding(%input: tensor<1x256x256x2xf32>, %filter:tensor<2x4x4x2xf32>) -> tensor<1x512x512x2xf32> {
+  %0 = mhlo.convolution(%input, %filter)
+    dim_numbers = [b, 0, 1, f]x[o, 0, 1, i]->[b, 0, 1, f],
+    window = {pad = [[2, 2], [2, 2]], lhs_dilate = [2, 2]}
+    {batch_group_count = 1 : i64, feature_group_count = 1 : i64}
+    : (tensor<1x256x256x2xf32>, tensor<2x4x4x2xf32>) -> tensor<1x512x512x2xf32>
+    func.return %0 : tensor<1x512x512x2xf32>
+  // CHECK  %cst = arith.constant dense<0.000000e+00> : tensor<2xf32>
+  // CHECK  %cst_0 = arith.constant dense<[1, 2]> : tensor<2xi32>
+  // CHECK  %0 = "tfl.reverse_v2"(%arg1, %cst_0) : (tensor<2x4x4x2xf32>, tensor<2xi32>) -> tensor<2x4x4x2xf32>
+  // CHECK  %1 = "tfl.pseudo_const"() <{value = dense<[1, 512, 512, 2]> : tensor<4xi32>}> : () -> tensor<4xi32>
+  // CHECK  %2 = "tfl.transpose_conv"(%1, %0, %arg0, %cst) <{fused_activation_function = "NONE", padding = "SAME", stride_h = 2 : i32, stride_w = 2 : i32}> : (tensor<4xi32>, tensor<2x4x4x2xf32>, tensor<1x256x256x2xf32>, tensor<2xf32>) -> tensor<1x512x512x2xf32>
+  // CHECK  return %2 : tensor<1x512x512x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: transpose_conv2d_valid_padding
+func.func @transpose_conv2d_valid_padding(%input: tensor<1x256x256x2xf32>, %filter:tensor<2x4x4x2xf32>) -> tensor<1x514x514x2xf32> {
+  %0 = mhlo.convolution(%input, %filter)
+    dim_numbers = [b, 0, 1, f]x[o, 0, 1, i]->[b, 0, 1, f],
+    window = {pad = [[3, 3], [3, 3]], lhs_dilate = [2, 2]}
+    {batch_group_count = 1 : i64, feature_group_count = 1 : i64}
+    : (tensor<1x256x256x2xf32>, tensor<2x4x4x2xf32>) -> tensor<1x514x514x2xf32>
+  func.return %0 : tensor<1x514x514x2xf32>
+  // CHECK  %cst = arith.constant dense<0.000000e+00> : tensor<2xf32>
+  // CHECK  %cst_0 = arith.constant dense<[1, 2]> : tensor<2xi32>
+  // CHECK  %0 = "tfl.reverse_v2"(%arg1, %cst_0) : (tensor<2x4x4x2xf32>, tensor<2xi32>) -> tensor<2x4x4x2xf32>
+  // CHECK  %1 = "tfl.pseudo_const"() <{value = dense<[1, 514, 514, 2]> : tensor<4xi32>}> : () -> tensor<4xi32>
+  // CHECK  %2 = "tfl.transpose_conv"(%1, %0, %arg0, %cst) <{fused_activation_function = "NONE", padding = "VALID", stride_h = 2 : i32, stride_w = 2 : i32}> : (tensor<4xi32>, tensor<2x4x4x2xf32>, tensor<1x256x256x2xf32>, tensor<2xf32>) -> tensor<1x514x514x2xf32>
+  // CHECK  return %2 : tensor<1x514x514x2xf32>
+}
+
 // CHECK-LABEL: conv2d_nhwc_ohwi_nhwc
 func.func @conv2d_nhwc_ohwi_nhwc(%input: tensor<1x256x256x3xf32>, %filter: tensor<2x1x1x3xf32>) -> tensor<1x256x256x2xf32> {
   %0 = mhlo.convolution(%input, %filter)
@@ -982,7 +1016,6 @@ func.func @depthwise_conv2d_nhwc_ihwo_nhwc_non_trivial_depth_multiplier(%arg0: t
 
 // -----
 
-// TODO: b/351437662 - Add support for conv to resize.
 // CHECK-LABEL: conv2d_resize_perferred_nhwc_hwoi_nhwc
 func.func @conv2d_resize_perferred_nhwc_hwoi_nhwc(%arg0: tensor<1x56x1248x16xf32>, %arg1: tensor<16x3x1x1xf32>) -> tensor<1x111x1248x16xf32> {
 	%0 = "mhlo.convolution"(%arg0, %arg1) {
@@ -996,13 +1029,13 @@ func.func @conv2d_resize_perferred_nhwc_hwoi_nhwc(%arg0: tensor<1x56x1248x16xf32
     window_strides = dense<[1, 1]> : tensor<2xi64>
   } : (tensor<1x56x1248x16xf32>, tensor<16x3x1x1xf32>) -> tensor<1x111x1248x16xf32>
   func.return %0 : tensor<1x111x1248x16xf32>
+  // CHECK  %0 = "tfl.pseudo_const"() <{value = dense<[111, 1248]> : tensor<2xi32>}> : () -> tensor<2xi32>
+  // CHECK  %1 = "tfl.resize_bilinear"(%arg0, %0) <{align_corners = false, half_pixel_centers = false}> : (tensor<1x56x1248x16xf32>, tensor<2xi32>) -> tensor<1x111x1248x16xf32>
+  // CHECK  return %1 : tensor<1x111x1248x16xf32>
 }
-
-// CHECK-NOT: tfl
 
 // -----
 
-// TODO: b/351437662 - Add support for conv to resize.
 // CHECK-LABEL: conv2d_to_resize_nhwc_hwoi_nhwc
 func.func @conv2d_to_resize_nhwc_hwoi_nhwc(%arg0: tensor<1x56x624x16xf32>, %arg1: tensor<16x1x257x1xf32>) -> tensor<1x56x904x16xf32> {
 	%0 = "mhlo.convolution"(%arg0, %arg1) {
@@ -1016,9 +1049,10 @@ func.func @conv2d_to_resize_nhwc_hwoi_nhwc(%arg0: tensor<1x56x624x16xf32>, %arg1
     window_strides = dense<[1, 89]> : tensor<2xi64>
   } : (tensor<1x56x624x16xf32>, tensor<16x1x257x1xf32>) -> tensor<1x56x904x16xf32>
   func.return %0 : tensor<1x56x904x16xf32>
+  // CHECK  %0 = "tfl.pseudo_const"() <{value = dense<[56, 904]> : tensor<2xi32>}> : () -> tensor<2xi32>
+  // CHECK  %1 = "tfl.resize_bilinear"(%arg0, %0) <{align_corners = true, half_pixel_centers = false}> : (tensor<1x56x624x16xf32>, tensor<2xi32>) -> tensor<1x56x904x16xf32>
+  // CHECK  return %1 : tensor<1x56x904x16xf32>
 }
-
-// CHECK-NOT: tfl
 
 // -----
 
