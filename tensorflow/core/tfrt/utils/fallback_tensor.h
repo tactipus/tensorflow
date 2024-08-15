@@ -65,6 +65,7 @@ class FallbackTensor {
   FallbackTensor& operator=(const FallbackTensor& other) {
     tsl::profiler::TraceMe trace_me("FallbackTensor::Copy");
     if (!other.is_immutable() && other.buffer() != nullptr) {
+      VLOG(2) << "[clin-async] create an ImmutableTensor 00000000";
       // Create a new TensorBuffer which contains a new atomic counter for each
       // result, to avoid downstream threads contending the original atomic
       // counter.
@@ -72,6 +73,7 @@ class FallbackTensor {
           tensorflow::tfrt_stub::ImmutableTensor::Create(other.tensor())
               .tensor());
     } else {
+      VLOG(2) << "[clin-async] copy an ImmutableTensor 11111111";
       // For immutable tensors or empty tensors, we just need to copy the
       // pointer as they don't incur atomic operations when they are referenced.
       tensor_ = other.tensor();

@@ -32,8 +32,10 @@ class ImmutableTensorBuffer final : public tensorflow::TensorBuffer {
   explicit ImmutableTensorBuffer(tensorflow::Tensor tensor)
       : tensorflow::TensorBuffer(tensor.data()), tensor_(std::move(tensor)) {
     if (auto* buf = tensorflow::DMAHelper::buffer(&tensor_)) {
+      VLOG(2) << "[clin-async] before accessing buf->root_buffer";
       root_buffer_ = buf->root_buffer();
     } else {
+      VLOG(2) << "[clin-async] before root_buffer_ = this";
       root_buffer_ = this;
     }
   }
@@ -70,7 +72,9 @@ ImmutableTensorBuffer::Create(tensorflow::Tensor tensor) {
 ImmutableTensor ImmutableTensor::Create(tensorflow::Tensor tensor) {
   auto dtype = tensor.dtype();
   auto shape = tensor.shape();
+  VLOG(2) << "[clin] before copying immutable_buffer 0000";
   auto immutable_buffer = ImmutableTensorBuffer::Create(std::move(tensor));
+  VLOG(2) << "[clin] after copying immutable_buffer 1111";
   return ImmutableTensor(
       tensorflow::Tensor(dtype, shape, std::move(immutable_buffer)));
 }
