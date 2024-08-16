@@ -33,9 +33,30 @@ limitations under the License.
 
 namespace tflite {
 
+const char* AllocTypeName(TfLiteAllocationType type) {
+  switch (type) {
+    case kTfLiteMemNone:
+      return "kTfLiteMemNone";
+    case kTfLiteMmapRo:
+      return "kTfLiteMmapRo";
+    case kTfLiteDynamic:
+      return "kTfLiteDynamic";
+    case kTfLiteArenaRw:
+      return "kTfLiteArenaRw";
+    case kTfLiteArenaRwPersistent:
+      return "kTfLiteArenaRwPersistent";
+    case kTfLitePersistentRo:
+      return "kTfLitePersistentRo";
+    case kTfLiteCustom:
+      return "kTfLiteCustom";
+    case kTfLiteVariantObject:
+      return "kTfLiteVariantObject";
+  }
+  return "(invalid)";
+}
+
 namespace {
 // Just forward declarations.
-const char* AllocTypeName(TfLiteAllocationType type);
 
 void PrintIntVector(const std::vector<int>& v,
                     bool collapse_consecutives = true,
@@ -346,28 +367,6 @@ const char* TensorTypeName(TfLiteType type) {
       return "kTfLiteVariant";
     case kTfLiteInt4:
       return "kTfLiteInt4";
-  }
-  return "(invalid)";
-}
-
-const char* AllocTypeName(TfLiteAllocationType type) {
-  switch (type) {
-    case kTfLiteMemNone:
-      return "kTfLiteMemNone";
-    case kTfLiteMmapRo:
-      return "kTfLiteMmapRo";
-    case kTfLiteDynamic:
-      return "kTfLiteDynamic";
-    case kTfLiteArenaRw:
-      return "kTfLiteArenaRw";
-    case kTfLiteArenaRwPersistent:
-      return "kTfLiteArenaRwPersistent";
-    case kTfLitePersistentRo:
-      return "kTfLitePersistentRo";
-    case kTfLiteCustom:
-      return "kTfLiteCustom";
-    case kTfLiteVariantObject:
-      return "kTfLiteVariantObject";
   }
   return "(invalid)";
 }

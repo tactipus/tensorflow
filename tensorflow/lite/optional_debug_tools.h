@@ -22,6 +22,8 @@ limitations under the License.
 #include "tensorflow/lite/core/interpreter.h"
 
 namespace tflite {
+// Returns the name of the allocation type.
+const char* AllocTypeName(TfLiteAllocationType type);
 
 // Prints a dump of what tensors and what nodes are in the interpreter.
 void PrintInterpreterState(const impl::Interpreter* interpreter,
