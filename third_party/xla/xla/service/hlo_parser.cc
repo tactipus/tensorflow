@@ -4515,7 +4515,9 @@ bool HloParserImpl::ParseDenseLiteral(Literal* literal, const Shape& shape) {
     }  // end of switch
   } while (nest_level > 0);
 
-  *literal = literal->Relayout(shape.layout());
+  if (shape.has_layout()) {
+    *literal = literal->Relayout(shape.layout());
+  }
   return true;
 }
 
@@ -6123,7 +6125,6 @@ bool HloParserImpl::ParseShape(Shape* result) {
     result->add_dimensions(dimension_sizes[i]);
     result->set_dynamic_dimension(i, dynamic_dimensions[i]);
   }
-  LayoutUtil::SetToDefaultLayout(result);
   // We need to lookahead to see if a following open brace is the start of a
   // layout. The specific problematic case is:
   //

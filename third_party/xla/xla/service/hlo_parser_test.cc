@@ -2501,14 +2501,14 @@ R"(HloModule test
 ENTRY test {
     ROOT root = add(f32[10] parameter(0), multiply(f32[10] parameter(1), f32[10] parameter(2)))
 })",
-R"(HloModule test, entry_computation_layout={(f32[10]{0}, f32[10]{0}, f32[10]{0})->f32[10]{0}}
+R"(HloModule test, entry_computation_layout={(f32[10], f32[10], f32[10])->f32[10]}
 
 ENTRY test {
-  parameter.anon = f32[10]{0} parameter(0)
-  parameter.anon.1 = f32[10]{0} parameter(1)
-  parameter.anon.2 = f32[10]{0} parameter(2)
-  multiply.anon = f32[10]{0} multiply(parameter.anon.1, parameter.anon.2)
-  ROOT root = f32[10]{0} add(parameter.anon, multiply.anon)
+  parameter.anon = f32[10] parameter(0)
+  parameter.anon.1 = f32[10] parameter(1)
+  parameter.anon.2 = f32[10] parameter(2)
+  multiply.anon = f32[10] multiply(parameter.anon.1, parameter.anon.2)
+  ROOT root = f32[10] add(parameter.anon, multiply.anon)
 })"
 },
 
@@ -2519,14 +2519,14 @@ ENTRY test {
   add = add(f32[10] parameter(0), f32[10] parameter(1))
   ROOT add2 = add(add, add(add, add))
 })",
-R"(HloModule test, entry_computation_layout={(f32[10]{0}, f32[10]{0})->f32[10]{0}}
+R"(HloModule test, entry_computation_layout={(f32[10], f32[10])->f32[10]}
 
 ENTRY test {
-  parameter.anon = f32[10]{0} parameter(0)
-  parameter.anon.1 = f32[10]{0} parameter(1)
-  add = f32[10]{0} add(parameter.anon, parameter.anon.1)
-  add.anon = f32[10]{0} add(add, add)
-  ROOT add2 = f32[10]{0} add(add, add.anon)
+  parameter.anon = f32[10] parameter(0)
+  parameter.anon.1 = f32[10] parameter(1)
+  add = f32[10] add(parameter.anon, parameter.anon.1)
+  add.anon = f32[10] add(add, add)
+  ROOT add2 = f32[10] add(add, add.anon)
 })"
 },
 
@@ -2539,13 +2539,13 @@ ENTRY test {
     (f32[10], f16[10]) tuple(f32[10] parameter(0), f16[10] parameter(1))
   ), index=0
 })",
-R"(HloModule test, entry_computation_layout={(f32[10]{0}, f16[10]{0})->f32[10]{0}}
+R"(HloModule test, entry_computation_layout={(f32[10], f16[10])->f32[10]}
 
 ENTRY test {
-  parameter.anon = f32[10]{0} parameter(0)
-  parameter.anon.1 = f16[10]{0} parameter(1)
-  tuple.anon = (f32[10]{0}, f16[10]{0}) tuple(parameter.anon, parameter.anon.1)
-  ROOT root = f32[10]{0} get-tuple-element(tuple.anon), index=0
+  parameter.anon = f32[10] parameter(0)
+  parameter.anon.1 = f16[10] parameter(1)
+  tuple.anon = (f32[10], f16[10]) tuple(parameter.anon, parameter.anon.1)
+  ROOT root = f32[10] get-tuple-element(tuple.anon), index=0
 })"
 },
 
@@ -2557,14 +2557,14 @@ ENTRY test {
   add = add(f32[10] parameter(0), f32[10] parameter(1))
   ROOT root = tuple(add, add(add, add), add)
 })",
-R"(HloModule test, entry_computation_layout={(f32[10]{0}, f32[10]{0})->(f32[10]{0}, f32[10]{0}, f32[10]{0})}
+R"(HloModule test, entry_computation_layout={(f32[10], f32[10])->(f32[10], f32[10], f32[10])}
 
 ENTRY test {
-  parameter.anon = f32[10]{0} parameter(0)
-  parameter.anon.1 = f32[10]{0} parameter(1)
-  add = f32[10]{0} add(parameter.anon, parameter.anon.1)
-  add.anon = f32[10]{0} add(add, add)
-  ROOT root = (f32[10]{0}, f32[10]{0}, f32[10]{0}) tuple(add, add.anon, add)
+  parameter.anon = f32[10] parameter(0)
+  parameter.anon.1 = f32[10] parameter(1)
+  add = f32[10] add(parameter.anon, parameter.anon.1)
+  add.anon = f32[10] add(add, add)
+  ROOT root = (f32[10], f32[10], f32[10]) tuple(add, add.anon, add)
 })"
 },
 
@@ -2575,12 +2575,12 @@ R"(HloModule test
 ENTRY test {
   ROOT root = sqrt(f32[10,10] broadcast(f32[] parameter(0)))
 })",
-R"(HloModule test, entry_computation_layout={(f32[])->f32[10,10]{1,0}}
+R"(HloModule test, entry_computation_layout={(f32[])->f32[10,10]}
 
 ENTRY test {
   parameter.anon = f32[] parameter(0)
-  broadcast.anon = f32[10,10]{1,0} broadcast(parameter.anon), dimensions={}
-  ROOT root = f32[10,10]{1,0} sqrt(broadcast.anon)
+  broadcast.anon = f32[10,10] broadcast(parameter.anon), dimensions={}
+  ROOT root = f32[10,10] sqrt(broadcast.anon)
 })"
 },
 
@@ -4291,14 +4291,15 @@ ENTRY %entrycomp (p: f32[2,2]) -> f32[2,2] {
 )";
 
   ExpectHasSubstr(ParseAndReturnUnverifiedModule(text).status().message(),
-                  "The declared operand shape f32[2,5]{1,0} is not compatible"
-                  " with the shape of the operand instruction f32[2,2]{1,0}.");
+                  "The declared operand shape f32[2,5] is not compatible with "
+                  "the shape of the operand instruction f32[2,2]");
 }
 
 TEST_F(HloParserTest, ParseShapeStringR2F32) {
   std::string shape_string = "f32[123,456]";
   TF_ASSERT_OK_AND_ASSIGN(Shape actual, ParseShape(shape_string));
   Shape expected = ShapeUtil::MakeShape(F32, {123, 456});
+  expected.clear_layout();
   ASSERT_TRUE(ShapeUtil::Equal(expected, actual))
       << "expected: " << ShapeUtil::HumanString(expected)
       << "actual:   " << ShapeUtil::HumanString(actual);
@@ -4309,6 +4310,7 @@ TEST_F(HloParserTest, ParseShapeStringUnbounded) {
   TF_ASSERT_OK_AND_ASSIGN(Shape actual, ParseShape(shape_string));
   Shape expected =
       ShapeUtil::MakeShape(F32, {Shape::kUnboundedSize, 784}, {true, false});
+  expected.clear_layout();
   ASSERT_TRUE(ShapeUtil::Equal(expected, actual))
       << "expected: " << ShapeUtil::HumanString(expected)
       << "actual:   " << ShapeUtil::HumanString(actual);
@@ -4320,6 +4322,11 @@ TEST_F(HloParserTest, ParseShapeStringTupleOfArrays) {
   Shape expected =
       ShapeUtil::MakeTupleShape({ShapeUtil::MakeShape(F32, {1572864}),
                                  ShapeUtil::MakeShape(S8, {5120, 1024})});
+  EXPECT_OK(ShapeUtil::ForEachMutableLeafShapeWithStatus(
+      &expected, [](Shape* leaf, const ShapeIndex&) {
+        leaf->clear_layout();
+        return absl::OkStatus();
+      }));
   ASSERT_TRUE(ShapeUtil::Equal(expected, actual))
       << "expected: " << ShapeUtil::HumanString(expected)
       << "actual:   " << ShapeUtil::HumanString(actual);
@@ -4335,6 +4342,11 @@ TEST_F(HloParserTest, ParseShapeStringNestedTuple) {
       ShapeUtil::MakeOpaqueShape(),
       ShapeUtil::MakeShape(F32, {3}),
   });
+  EXPECT_OK(ShapeUtil::ForEachMutableLeafShapeWithStatus(
+      &expected, [](Shape* leaf, const ShapeIndex&) {
+        leaf->clear_layout();
+        return absl::OkStatus();
+      }));
   ASSERT_TRUE(ShapeUtil::Equal(expected, actual))
       << "expected: " << ShapeUtil::HumanString(expected)
       << "actual:   " << ShapeUtil::HumanString(actual);
@@ -4498,6 +4510,7 @@ TEST_F(HloParserTest, ParseDynamicArray) {
   std::string shape_string = "f32[123,<=456]";
   TF_ASSERT_OK_AND_ASSIGN(Shape actual, ParseShape(shape_string));
   Shape expected = ShapeUtil::MakeShape(F32, {123, 456}, {false, true});
+  expected.clear_layout();
   ASSERT_TRUE(ShapeUtil::Equal(expected, actual))
       << "expected: " << ShapeUtil::HumanString(expected)
       << "actual:   " << ShapeUtil::HumanString(actual);
@@ -4509,6 +4522,11 @@ TEST_F(HloParserTest, ParseDynamicTuple) {
   Shape expected = ShapeUtil::MakeTupleShape(
       {ShapeUtil::MakeShape(F32, {42}),
        ShapeUtil::MakeShape(U32, {123, 456}, {true, true})});
+  EXPECT_OK(ShapeUtil::ForEachMutableLeafShapeWithStatus(
+      &expected, [](Shape* leaf, const ShapeIndex&) {
+        leaf->clear_layout();
+        return absl::OkStatus();
+      }));
   ASSERT_TRUE(ShapeUtil::Equal(expected, actual))
       << "expected: " << ShapeUtil::HumanString(expected)
       << "actual:   " << ShapeUtil::HumanString(actual);
@@ -4758,9 +4776,10 @@ ENTRY InferUnaryShape {
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(auto module, ParseAndReturnVerifiedModule(text));
+  Shape expected = ShapeUtil::MakeScalarShape(F32);
+  expected.clear_layout();
   EXPECT_TRUE(ShapeUtil::Equal(
-      module->entry_computation()->ComputeProgramShape().result(),
-      ShapeUtil::MakeScalarShape(F32)));
+      module->entry_computation()->ComputeProgramShape().result(), expected));
 }
 
 TEST_F(HloParserTest, CheckAliasPassthroughParams) {
