@@ -2940,6 +2940,87 @@ func.func @less_equal(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>) -> tensor<2xi1
 
 // -----
 
+//===----------------------------------------------------------------------===//
+// mhlo binary element-wise ops
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: add
+func.func @add(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+  %0 = mhlo.add %arg0, %arg0 : tensor<2xi32>
+  func.return %0 : tensor<2xi32>
+}
+
+// CHECK: tfl.add
+// CHECK-NOT: mhlo
+
+// -----
+
+// CHECK-LABEL: maximum
+func.func @maximum(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+  %0 = mhlo.maximum %arg0, %arg1 : tensor<4xf32>
+  func.return %0 : tensor<4xf32>
+}
+
+// CHECK: "tfl.maximum"(%arg0, %arg1)
+// CHECK-NOT: mhlo
+
+// -----
+
+// CHECK-LABEL: minimum
+func.func @minimum(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+  %0 = mhlo.minimum %arg0, %arg1 : tensor<4xf32>
+  func.return %0 : tensor<4xf32>
+}
+
+// CHECK: "tfl.minimum"(%arg0, %arg1)
+// CHECK-NOT: mhlo
+
+// -----
+
+// CHECK-LABEL: mul
+func.func @mul(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+  %0 = mhlo.multiply %arg0, %arg0 : tensor<2xi32>
+  func.return %0 : tensor<2xi32>
+}
+
+// CHECK: tfl.mul %arg0, %arg0
+// CHECK-NOT: mhlo
+
+// -----
+
+// CHECK-LABEL: div
+func.func @div(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+  %0 = mhlo.divide %arg0, %arg0 : tensor<2xi32>
+  func.return %0 : tensor<2xi32>
+}
+
+// CHECK: tfl.div %arg0, %arg0
+// CHECK-NOT: mhlo
+
+// -----
+
+// CHECK-LABEL: sub
+func.func @sub(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+  %0 = mhlo.subtract %arg0, %arg0 : tensor<2xi32>
+  func.return %0 : tensor<2xi32>
+}
+
+// CHECK: tfl.sub %arg0, %arg0
+// CHECK-NOT: mhlo
+
+// -----
+
+// CHECK-LABEL: pow
+func.func @pow(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  %0 = mhlo.power %arg0, %arg0 : tensor<4xf32>
+  func.return %0 : tensor<4xf32>
+}
+
+// CHECK: tfl.pow
+// CHECK-NOT: mhlo
+
+// -----
+
 // CHECK-LABEL: clamp
 func.func @clamp(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<f32>) -> tensor<f32> {
   %0 = "mhlo.clamp"(%arg0, %arg1, %arg2) : (tensor<f32>, tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -2949,3 +3030,5 @@ func.func @clamp(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<f32>) -> 
 // CHECK-NEXT: %0 = "tfl.minimum"(%arg1, %arg2)
 // CHECK-NEXT: %1 = "tfl.maximum"(%0, %arg0)
 // CHECK-NEXT: return %1 : tensor<f32>
+
+
