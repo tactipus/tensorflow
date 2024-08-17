@@ -32,6 +32,7 @@ tsl_pybind_extension(
         "-frtti",
     ],
     features = ["-use_header_modules"],
+    visibility = ["//tensorflow/python:__pkg__"],
     deps = [
         "@pybind11",
         "@stablehlo//:stablehlo_portable_api",

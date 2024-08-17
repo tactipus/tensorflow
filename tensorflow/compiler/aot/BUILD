@@ -1,3 +1,4 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("//tensorflow:tensorflow.bzl", "if_google", "if_oss", "tf_cc_binary", "tf_cc_test")
 load("//tensorflow/compiler/aot:tfcompile.bzl", "tf_library")
 load(
@@ -382,3 +383,14 @@ exports_files([
     "benchmark_main.template",  # used by tf_library(...,gen_benchmark=True)
     if_oss("test.cc", "test_google.cc"),  # used by tf_library(...,gen_test=True)
 ])
+
+bzl_library(
+    name = "tfcompile_bzl",
+    srcs = ["tfcompile.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
+    deps = [
+        "//tensorflow:tensorflow_bzl",
+        "//tensorflow:tensorflow_google_bzl",
+    ],
+)
