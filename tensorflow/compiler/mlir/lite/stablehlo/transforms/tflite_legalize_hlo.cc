@@ -210,10 +210,8 @@ void AddRoundingOpsAsUnknown(ConversionTarget& target) {
   target.addDynamicallyLegalOp<
       // go/keep-sorted start
       // clang-format off
-      mhlo::AddOp,
       mhlo::BroadcastInDimOp,
       mhlo::ConstantOp,
-      mhlo::DivOp,
       mhlo::FloorOp,
       mhlo::MulOp,
       mhlo::RemOp,
@@ -294,17 +292,23 @@ void LegalizeHloToTfLitePass::runOnOperation() {
   target.addDynamicallyLegalOp<mhlo::CompareOp>(IsCompareLegal);
 
   target.addIllegalOp<
+      // go/keep-sorted start
       // clang-format off
-    // go/keep-sorted start
-    mhlo::ClampOp,
-    mhlo::DotGeneralOp,
-    mhlo::DotOp,
-    mhlo::DynamicReshapeOp,
-    mhlo::RemOp,
-    mhlo::ReshapeOp,
-    mhlo::ShiftRightArithmeticOp,
-    mhlo::ShiftRightLogicalOp,
-    mhlo::TransposeOp
+      mhlo::AddOp,
+      mhlo::ClampOp,
+      mhlo::DivOp,
+      mhlo::DotGeneralOp,
+      mhlo::DotOp,
+      mhlo::DynamicReshapeOp,
+      mhlo::MaxOp,
+      mhlo::MinOp,
+      mhlo::MulOp,
+      mhlo::RemOp,
+      mhlo::ReshapeOp,
+      mhlo::ShiftRightArithmeticOp,
+      mhlo::ShiftRightLogicalOp,
+      mhlo::SubtractOp,
+      mhlo::TransposeOp
       // clang-format on
       // go/keep-sorted end
       >();
