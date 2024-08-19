@@ -15,6 +15,7 @@ limitations under the License.
 #ifndef TENSORFLOW_COMPILER_MLIR_LITE_STABLEHLO_TRANSFORMS_LEGALIZE_HLO_CONVERSIONS_CONV_UTIL_H_
 #define TENSORFLOW_COMPILER_MLIR_LITE_STABLEHLO_TRANSFORMS_LEGALIZE_HLO_CONVERSIONS_CONV_UTIL_H_
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -22,11 +23,11 @@ limitations under the License.
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SmallVector.h"
-#include "mlir/IR/BuiltinAttributes.h"  // from @llvm-project
 #include "mlir/IR/Types.h"  // from @llvm-project
 #include "mlir/Support/LLVM.h"  // from @llvm-project
 #include "tensorflow/compiler/mlir/lite/stablehlo/transforms/legalize_hlo_conversions/op_util_common.h"
 #include "xla/mlir_hlo/mhlo/IR/hlo_ops.h"
+#include "tensorflow/core/lib/math/math_util.h"
 
 // Helpers for working with mhlo.convolution attrs in the mlir api as
 // native cc types.
@@ -114,11 +115,97 @@ inline bool IsTrivialConv(const ConvView& data) {
 // Supported non-trivial conv predicates
 //=-----
 
+inline bool MatchWithResizeBilinearOp(const ConvView& data,
+                                      bool& align_corners) {
+  bool is_supported_2d =
+      data.InputLayout().Rank() == 4 && data.KernelLayout().Rank() == 4 &&
+      data.OutputLayout().Rank() == 4 &&
+      data.InputLayout().Spatials() == data.OutputLayout().Spatials();
+
+  bool is_supported_dilations_strides_and_padding =
+      (data.InputDilations().size() == 2) &&
+      (llvm::all_of(data.KernelDilations(), [](auto d) { return d == 1; })) &&
+      data.Strides().size() == 2 && data.Padding().size() == 2;
+
+  // This is based on method in compiler/tf2xla/kernels/image_resize_ops.cc
+  auto can_convert_to_bilinear_impl = [](bool align_corners, int64_t dilation,
+                                         int64_t padding, int64_t stride,
+                                         int64_t input_spatial,
+                                         int64_t output_spatial) {
+    int64_t input_spatial_size =
+        align_corners ? input_spatial - 1 : input_spatial;
+    int64_t output_spatial_size =
+        align_corners ? output_spatial - 1 : output_spatial;
+
+    int64_t gcd =
+        tensorflow::MathUtil::GCD(static_cast<uint64_t>(input_spatial_size),
+                                  static_cast<uint64_t>(output_spatial_size));
+
+    if ((gcd == 0) || (input_spatial_size % gcd != 0) ||
+        (input_spatial_size / gcd != stride) || (dilation - 1 != padding)) {
+      return false;
+    }
+    return true;
+  };
+
+  bool can_convert_to_bilinear = false;
+  if (data.InputDilations()[0] != 1 && data.InputDilations()[1] == 1) {
+    if (can_convert_to_bilinear_impl(
+            /*align_corners=*/true, data.InputDilations()[0],
+            data.Padding()[0].Lo(), data.Strides()[0],
+            data.InputShape()[data.InputLayout().Spatials()[0]],
+            data.OutputShape()[data.OutputLayout().Spatials()[0]])) {
+      align_corners = true;
+      can_convert_to_bilinear = true;
+    } else if (can_convert_to_bilinear_impl(
+                   /*align_corners=*/false, data.InputDilations()[0],
+                   data.Padding()[0].Lo(), data.Strides()[0],
+                   data.InputShape()[data.InputLayout().Spatials()[0]],
+                   data.OutputShape()[data.OutputLayout().Spatials()[0]])) {
+      align_corners = false;
+      can_convert_to_bilinear = true;
+    };
+  } else if (data.InputDilations()[0] == 1 && data.InputDilations()[1] != 1) {
+    if (can_convert_to_bilinear_impl(
+            /*align_corners=*/true, data.InputDilations()[1],
+            data.Padding()[1].Lo(), data.Strides()[1],
+            data.InputShape()[data.InputLayout().Spatials()[1]],
+            data.OutputShape()[data.OutputLayout().Spatials()[1]])) {
+      align_corners = true;
+      can_convert_to_bilinear = true;
+    } else if (can_convert_to_bilinear_impl(
+                   /*align_corners=*/false, data.InputDilations()[1],
+                   data.Padding()[1].Lo(), data.Strides()[1],
+                   data.InputShape()[data.InputLayout().Spatials()[1]],
+                   data.OutputShape()[data.OutputLayout().Spatials()[1]])) {
+      align_corners = false;
+      can_convert_to_bilinear = true;
+    };
+  }
+
+  return is_supported_2d && is_supported_dilations_strides_and_padding &&
+         can_convert_to_bilinear;
+}
+
+inline bool MatchWithResizeBilinearOp(const ConvView& data) {
+  bool align_corners = false;
+  return MatchWithResizeBilinearOp(data, align_corners);
+}
+
+bool IsTransposeConvPaddingValid(mhlo::ConvolutionOp conv_op,
+                                 size_t num_spatial_dims,
+                                 ArrayRef<int64_t> strides,
+                                 ArrayRef<int64_t> padding);
+
+bool IsTransposeConvPaddingSame(mhlo::ConvolutionOp conv_op,
+                                size_t num_spatial_dims,
+                                ArrayRef<int64_t> strides);
+
 inline bool IsSupportedNonTrivialConv(const ConvView& data) {
   // Only non-trivial 2d convolutions are supported.
   const bool valid_rank = data.InputLayout().Rank() == 4;
 
-  // Nagative padding is unsupported.
+  // Negative padding is unsupported.
   bool has_nagative_padding = llvm::all_of(
       data.Padding(),
       [](const DimPadding& p) { return p.Hi() < 0 || p.Lo() < 0; });
@@ -224,7 +311,7 @@ inline bool IsTFLNativeLayout(const ConvView& data) {
   std::optional<Layout> native_kernel_layout = std::nullopt;
   if (IsDepthwiseConv(data)) {
     native_kernel_layout = GetTFLNativeDepthwiseConvKernelLayout();
-  } else if (IsStandardConv(data)) {
+  } else if (IsStandardConv(data) || IsSupportedNonTrivialConv(data)) {
     native_kernel_layout = GetTFLNativeStandardConvKernelLayout(rank);
   }
   if (!native_kernel_layout.has_value()) {
