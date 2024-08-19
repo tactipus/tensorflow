@@ -213,6 +213,7 @@ cc_library(
     name = "fusions",
     srcs = ["fusions.cc"],
     hdrs = ["fusions.h"],
+    tags = ["gpu"],
     visibility = ["//xla/service/gpu:__subpackages__"],
     deps = [
         ":concatenate_mlir",
@@ -479,7 +480,7 @@ cc_library(
 xla_cc_test(
     name = "triton_test",
     srcs = ["triton_test.cc"],
-    local_defines = if_cuda_is_configured(["GOOGLE_CUDA=1"]),
+    tags = ["gpu"],
     deps = [
         ":fusion_emitter",
         ":fusions",
